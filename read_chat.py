@@ -52,7 +52,7 @@ def create_parser():
 async def main():
     logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
     parser = create_parser()
-    args, unknown = parser.parse_known_args()
+    args = parser.parse_args()
 
     history_path = Path(args.history)
     if not history_path.is_dir():
