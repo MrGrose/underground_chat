@@ -1,4 +1,5 @@
 import asyncio
+import configparser
 import json
 import logging
 
@@ -7,10 +8,35 @@ import configargparse
 logger = logging.getLogger(__name__)
 
 
-async def write_chat(host, port, account_hash, message):
+async def registration(host, port):
     reader, writer = await asyncio.open_connection(host, port)
     try:
         data = await reader.read(150)
+        logger.debug(data.decode().strip())
+
+        writer.write(b"\n")
+        await writer.drain()
+
+        data = await reader.readline()
+        logger.debug(data.decode().strip())
+
+        writer.write(b"\n")
+        await writer.drain()
+
+        data = await reader.readline()
+        logger.debug(data.decode().strip())
+
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+    return json.loads(data.decode().strip())
+
+
+async def write_chat(host, port, account_hash, message):
+    reader, writer = await asyncio.open_connection(host, port)
+    try:
+        data = await reader.readline()
         logger.debug(data.decode().strip())
 
         logger.debug(f"user account_hash: {account_hash}")
@@ -19,9 +45,11 @@ async def write_chat(host, port, account_hash, message):
 
         data = await reader.readline()
         logger.debug(data.decode().strip())
+
         if json.loads(data.decode()) is None:
             print("Неизвестный токен. Проверьте его или зарегистрируйте заново.")
             return
+
         logger.debug(f"user message: {message}")
         writer.write(message.encode() + b"\n\n")
         await writer.drain()
@@ -41,13 +69,25 @@ def create_parser():
     return parser
 
 
+def update_hash(new_hash, filename="config_write.ini"):
+    config = configparser.ConfigParser()
+    config.read(filename)
+    config.set("WRITE", "hash", new_hash)
+    with open(filename, "w") as configfile:
+        config.write(configfile)
+
+
 async def main():
     logging.basicConfig(filename="write_chat.log", format="%(asctime)s - %(levelname)s - %(message)s", level=logging.DEBUG)
     parser = create_parser()
     args = parser.parse_args()
 
-    await write_chat(args.host, args.port, args.hash, args.m)
+    if not args.hash:
+        account_hash = await registration(args.host, args.port)
+        update_hash(account_hash["account_hash"])
+        await write_chat(args.host, args.port, account_hash["account_hash"], args.m)
 
+    await write_chat(args.host, args.port, args.hash, args.m)
 
 if __name__ == "__main__":
     asyncio.run(main())
