@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 
 import configargparse
@@ -8,7 +9,6 @@ logger = logging.getLogger(__name__)
 
 async def write_chat(host, port, account_hash, message):
     reader, writer = await asyncio.open_connection(host, port)
-
     try:
         data = await reader.read(150)
         logger.debug(data.decode().strip())
@@ -19,7 +19,9 @@ async def write_chat(host, port, account_hash, message):
 
         data = await reader.readline()
         logger.debug(data.decode().strip())
-
+        if json.loads(data.decode()) is None:
+            print("Неизвестный токен. Проверьте его или зарегистрируйте заново.")
+            return
         logger.debug(f"user message: {message}")
         writer.write(message.encode() + b"\n\n")
         await writer.drain()
@@ -35,7 +37,7 @@ def create_parser():
     parser.add("--host", env_var="HOST", help="host сервера")
     parser.add("--port", env_var="WRITE_PORT", help="port сервера")
     parser.add("--hash", env_var="USER_TOKEN", help="token пользователя")
-    parser.add("-m", default="Я снова тестирую чатик. Раз-два-три.", help="сообщение")
+    parser.add("-m", default="Я снова тестирую чатик. Раз-два-три.", help="сообщение в чат")
     return parser
 
 
