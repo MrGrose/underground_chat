@@ -31,7 +31,7 @@ async def registration(host, port, nickname):
         data = await reader.readline()
         logger.debug(f"Регистрация: {data.decode().strip()}")
 
-        async with aiofiles.open("user_auth.txt", "w") as file:
+        async with aiofiles.open("user.txt", "w") as file:
             await file.write(data.decode().strip())
 
     finally:
@@ -71,9 +71,9 @@ async def submit_message(host, port, token, message):
         writer.write(token.encode() + b"\n")
         await writer.drain()
 
-        message_edit = "".join(message).replace("\n", "")
-        logger.debug(f"Соообщение: {message_edit}")
-        writer.write(message_edit.encode() + b"\n\n")
+        message_edited = "".join(message).replace("\n", "")
+        logger.debug(f"Соообщение: {message_edited}")
+        writer.write(message_edited.encode() + b"\n\n")
         await writer.drain()
 
     finally:
