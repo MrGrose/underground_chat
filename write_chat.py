@@ -1,10 +1,11 @@
+import argparse
 import asyncio
-import configparser
+import aiofiles
 import json
 import logging
 
-import configargparse
-from dotenv import load_dotenv
+
+from environs import Env
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,9 @@ async def registration(host, port, nickname):
 
         data = await reader.readline()
         logger.debug(f"Регистрация: {data.decode().strip()}")
+
+        async with aiofiles.open("user_auth.txt", "w") as file:
+            await file.write(data.decode().strip())
 
     finally:
         writer.close()
@@ -79,44 +83,48 @@ async def submit_message(host, port, token, message):
 
 
 def create_parser():
-    parser = configargparse.ArgParser(default_config_files=["config_write.ini"], description="Отправка сообщений в чат")
-    parser.add("-c", "--config", is_config_file=True, help="Путь к конфиг. файлу")
-    parser.add("--host", env_var="HOST", help="host сервера")
-    parser.add("--port", env_var="WRITE_PORT", help="port сервера")
-    parser.add("--token", env_var="USER_TOKEN", help="token пользователя")
-    parser.add("--nickname", env_var="USER_NAME", help="nickname пользователя")
-    parser.add("-m", default="Я снова тестирую чатик. Раз-два-три.", help="сообщение в чат")
+    parser = argparse.ArgumentParser(description="Отправка сообщений в чат")
+    parser.add_argument("--host", default="minechat.dvmn.org", help="host сервера")
+    parser.add_argument("--port", default=5050, help="port сервера")
+    parser.add_argument("--token", help="token пользователя")
+    parser.add_argument("--nickname", help="nickname пользователя")
+    parser.add_argument("-m", help="сообщение в чат")
     return parser
 
 
-def update_config(token, nickname, filename="config_write.ini"):
-    config = configparser.ConfigParser()
-    config.read(filename)
-    config.set("WRITE", "token", token)
-    config.set("WRITE", "nickname", nickname)
-    with open(filename, "w") as configfile:
-        config.write(configfile)
-
-
 async def main():
-    logging.basicConfig(filename="write_chat.log", format="%(asctime)s - %(levelname)s - %(message)s", level=logging.DEBUG)
-    load_dotenv(".env")
+    logging.basicConfig(filename="chat.log", format="%(asctime)s - %(levelname)s - %(message)s", level=logging.DEBUG)
+    env = Env()
+    env.read_env()
+
     parser = create_parser()
     args = parser.parse_args()
 
-    if not args.token:
-        user_data = await registration(args.host, args.port, args.nickname)
-        update_config(user_data["account_hash"], user_data["nickname"])
-        args = parser.parse_args()
-        await submit_message(args.host, args.port, args.token, args.m)
-    else:
-        is_authorized = await authorise(args.host, args.port, args.token)
-        if not is_authorized:
-            account_data = await registration(args.host, args.port, args.nickname)
-            update_config(account_data["account_hash"], account_data["nickname"])
-            args = parser.parse_args()
+    host = args.host or env.str("HOST")
+    port = args.port or env.int("SEND_PORT")
+    nickname = args.nickname or env.str("USER_NAME", None)
+    token = args.token or env.str("USER_TOKEN", None)
+    try:
+        if not args.m:
+            print("Текст сообщение не передан")
+            return
 
-        await submit_message(args.host, args.port, args.token, args.m)
+        if not token:
+            user_data = await registration(host, port, nickname)
+            await submit_message(host, port, user_data["account_hash"], args.m)
+
+        else:
+            if not await authorise(host, port, token):
+                await registration(host, port, nickname)
+
+            await submit_message(host, port, token, args.m)
+
+    except OSError as e:
+        logger.error(f"Ошибка соединения: {e}")
+    except ConnectionRefusedError:
+        logger.error("Соединение отклонено")
+    except Exception as e:
+        logger.error(f"Ошибка: {e}")
 
 
 if __name__ == "__main__":
