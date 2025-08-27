@@ -14,8 +14,8 @@ async def read_chat(host, port, folder_path):
     while True:
         try:
             reader, writer = await asyncio.open_connection(host, port)
-            while line_bytes := await reader.readline():
-                await save_message(line_bytes, folder_path)
+            while message := await reader.readline():
+                await save_message(message, folder_path)
                 await asyncio.sleep(1)
             writer.close()
             await writer.wait_closed()
@@ -28,12 +28,12 @@ async def read_chat(host, port, folder_path):
             await asyncio.sleep(5)
 
 
-async def save_message(line_bytes, folder_path):
+async def save_message(message, folder_path):
     folder = Path(__file__).parent / folder_path
     folder.mkdir(exist_ok=True)
     file_path = folder / "data.txt"
     formatted_date = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
-    message = f"[{formatted_date}] {line_bytes.decode()}"
+    message = f"[{formatted_date}] {message.decode()}"
     async with aiofiles.open(file_path, "a", encoding="utf-8") as file:
         await file.write(message)
 
