@@ -60,10 +60,6 @@ async def main():
     port = args.port or env.int("READ_PORT")
     history = args.history or env.str("HISTORY")
 
-    history_path = Path(history)
-    if not history_path.is_dir():
-        history_path.mkdir(parents=True, exist_ok=True)
-
     await read_chat(host, port, history)
 
 
