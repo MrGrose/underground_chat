@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import datetime
 import logging
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import aiofiles
@@ -10,16 +11,24 @@ from environs import Env
 logger = logging.getLogger(__name__)
 
 
+@asynccontextmanager
+async def managed_connection(host, port):
+    reader, writer = await asyncio.open_connection(host, port)
+    try:
+        yield reader, writer
+    finally:
+        writer.close()
+        await writer.wait_closed()
+
+
 async def read_chat(host, port, folder_path):
     while True:
         try:
-            reader, writer = await asyncio.open_connection(host, port)
-            while message := await reader.readline():
-                await save_message(message, folder_path)
-                await asyncio.sleep(1)
-            writer.close()
-            await writer.wait_closed()
-            break
+            async with managed_connection(host, port) as (reader, writer):
+                while message := await reader.readline():
+                    await save_message(message, folder_path)
+                    await asyncio.sleep(1)
+                break  
         except ConnectionError as e:
             logger.error(f"Сетевая ошибка: {e}")
             await asyncio.sleep(5)
