@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def managed_connection(host, port):
+async def get_connection(host, port):
     reader, writer = await asyncio.open_connection(host, port)
     try:
         yield reader, writer
@@ -24,7 +24,7 @@ async def managed_connection(host, port):
 async def read_chat(host, port, folder_path):
     while True:
         try:
-            async with managed_connection(host, port) as (reader, writer):
+            async with get_connection(host, port) as (reader, writer):
                 while message := await reader.readline():
                     await save_message(message, folder_path)
                     await asyncio.sleep(1)
